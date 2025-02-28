@@ -3,6 +3,7 @@ import "jsr:@std/dotenv/load";
 import { Hono } from "@hono/hono";
 import { cors } from "@hono/hono/cors";
 import { logger } from "@hono/hono/logger";
+import { sunTimes } from "./constants.ts";
 
 const app = new Hono();
 
@@ -164,6 +165,75 @@ app.get('/api/key-info', (c) => {
     keys: VALID_API_KEYS.length,
     dailyLimit: parseInt(Deno.env.get('DAILY_LIMIT') || '100')
   });
+});
+
+// Add this route to your Hono app
+app.get('/ramadan/:date', (c) => {
+  const date = c.req.param('date');
+  
+  // Validate date format (DD/MM/YYYY)
+  const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+  if (!dateRegex.test(date)) {
+    return c.json({ error: 'Invalid date format. Please use DD/MM/YYYY' }, 400);
+  }
+  
+  // Look up the sunrise and sunset times
+  const times = sunTimes[date];
+  
+  if (!times) {
+    return c.json({ error: 'No data available for the specified date' }, 404);
+  }
+  
+  return c.json(times);
+});
+
+// Alternative: Add a POST endpoint if you prefer
+app.post('/ramadan', async (c) => {
+  try {
+    const body = await c.req.json();
+    const date = body.date;
+    
+    if (!date) {
+      return c.json({ error: 'Date is required' }, 400);
+    }
+    
+    // Validate date format (DD/MM/YYYY)
+    const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+    if (!dateRegex.test(date)) {
+      return c.json({ error: 'Invalid date format. Please use DD/MM/YYYY' }, 400);
+    }
+    
+    // Look up the sunrise and sunset times
+    const times = sunTimes[date];
+    
+    if (!times) {
+      return c.json({ error: 'No data available for the specified date' }, 404);
+    }
+    
+    return c.json(times);
+  } catch (error) {
+    console.error('Error:', error);
+    return c.json({ error: 'An error occurred' }, 500);
+  }
+});
+
+// Helper function to get today's times
+function getTodaySunTimes(): { begin: string, end: string } | null {
+  const today = new Date();
+  const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+  
+  return sunTimes[formattedDate] || null;
+}
+
+// Add a route to get today's times
+app.get('/ramadan/today', (c) => {
+  const times = getTodaySunTimes();
+  
+  if (!times) {
+    return c.json({ error: 'No data available for today' }, 404);
+  }
+  
+  return c.json(times);
 });
 
 
