@@ -172,13 +172,13 @@ app.get('/ramadan/:date', (c) => {
   const date = c.req.param('date');
   
   // Validate date format (DD/MM/YYYY)
-  const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+  const dateRegex = /^\d{2}\_\d{2}\_\d{4}$/;
   if (!dateRegex.test(date)) {
-    return c.json({ error: 'Invalid date format. Please use DD/MM/YYYY' }, 400);
+    return c.json({ error: 'Invalid date format. Please use DD_MM_YYYY' }, 400);
   }
   
   // Look up the sunrise and sunset times
-  const times = sunTimes[date];
+  const times = sunTimes[date.replaceAll("_", "/")];
   
   if (!times) {
     return c.json({ error: 'No data available for the specified date' }, 404);
