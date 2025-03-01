@@ -42,14 +42,14 @@ const kv = await Deno.openKv();
 // Simple authentication middleware
 const authenticate = async (c: any, next: any) => {
   const apiKey = c.req.header('X-API-Key');
-  
+
   if (!apiKey || !VALID_API_KEYS.includes(apiKey)) {
     return c.json({ error: 'Unauthorized: Invalid API key' }, 401);
   }
-  
+
   // Use the API key as the user ID for simplicity
   c.set('userId', apiKey);
-  
+
   await next();
 };
 
@@ -57,21 +57,21 @@ const authenticate = async (c: any, next: any) => {
 const trackUsage = async (c: any, next: any) => {
   const userId = c.req.header('X-API-Key');
   const today = new Date().toISOString().split('T')[0];
-  
+
   // Get current usage count
   const usageKey = [`usage-${userId}-${today}`];
   const currentUsage = await kv.get(usageKey);
   const count = (currentUsage.value as number) || 0;
-  
+
   // Check if user has exceeded daily limit
   const DAILY_LIMIT = parseInt(Deno.env.get('DAILY_LIMIT') || '100');
   if (count >= DAILY_LIMIT) {
     return c.json({ error: 'Daily usage limit exceeded' }, 429);
   }
-  
+
   // Continue to the next handler
   await next();
-  
+
   // Increment usage after successful request
   await kv.set(usageKey, count + 1);
 };
@@ -92,16 +92,16 @@ app.use('/api/*', authenticate, trackUsage, checkOpenAiKey);
 app.get('/', (c) => c.json({ status: 'ok' }));
 
 // Get current usage
-app.get('/api/usage', async (c) => {
+app.get('/api/usage/', async (c) => {
   const userId = c.req.header("X-API-Key");
   const today = new Date().toISOString().split('T')[0];
-  
+
   const usageKey = [`usage-${userId}-${today}`];
   const currentUsage = await kv.get(usageKey);
   const count = (currentUsage.value as number) || 0;
-  
+
   const DAILY_LIMIT = parseInt(Deno.env.get('DAILY_LIMIT') || '100');
-  
+
   return c.json({
     usage: count,
     limit: DAILY_LIMIT,
@@ -110,7 +110,7 @@ app.get('/api/usage', async (c) => {
 });
 
 // Define the request handler for the completions endpoint
-app.post('/api/completions', async (c) => {
+app.post('/api/completions/', async (c) => {
   try {
     // Parse the request body
     const body = await c.req.json();
@@ -160,7 +160,7 @@ app.post('/api/completions', async (c) => {
 });
 
 // Get API key information
-app.get('/api/key-info', (c) => {
+app.get('/api/key-info/', (c) => {
   return c.json({
     keys: VALID_API_KEYS.length,
     dailyLimit: parseInt(Deno.env.get('DAILY_LIMIT') || '100')
@@ -170,46 +170,56 @@ app.get('/api/key-info', (c) => {
 // Add this route to your Hono app
 app.get('/ramadan/:date', (c) => {
   const date = c.req.param('date');
-  
+
+  if (date === "today") {
+    const times = getTodaySunTimes();
+
+    if (!times) {
+      return c.json({ error: 'No data available for today' }, 404);
+    }
+
+    return c.json(times);
+  }
+
   // Validate date format (DD/MM/YYYY)
   const dateRegex = /^\d{2}\_\d{2}\_\d{4}$/;
   if (!dateRegex.test(date)) {
     return c.json({ error: 'Invalid date format. Please use DD_MM_YYYY' }, 400);
   }
-  
+
   // Look up the sunrise and sunset times
   const times = sunTimes[date.replaceAll("_", "/")];
-  
+
   if (!times) {
     return c.json({ error: 'No data available for the specified date' }, 404);
   }
-  
+
   return c.json(times);
 });
 
 // Alternative: Add a POST endpoint if you prefer
-app.post('/ramadan', async (c) => {
+app.post('/ramadan/', async (c) => {
   try {
     const body = await c.req.json();
     const date = body.date;
-    
+
     if (!date) {
       return c.json({ error: 'Date is required' }, 400);
     }
-    
+
     // Validate date format (DD/MM/YYYY)
     const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
     if (!dateRegex.test(date)) {
       return c.json({ error: 'Invalid date format. Please use DD/MM/YYYY' }, 400);
     }
-    
+
     // Look up the sunrise and sunset times
     const times = sunTimes[date];
-    
+
     if (!times) {
       return c.json({ error: 'No data available for the specified date' }, 404);
     }
-    
+
     return c.json(times);
   } catch (error) {
     console.error('Error:', error);
@@ -221,18 +231,18 @@ app.post('/ramadan', async (c) => {
 function getTodaySunTimes(): { begin: string, end: string } | null {
   const today = new Date();
   const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-  
+  console.log(formattedDate);
   return sunTimes[formattedDate] || null;
 }
 
 // Add a route to get today's times
-app.get('/ramadan/today', (c) => {
+app.get('/ramadan/today/', (c) => {
   const times = getTodaySunTimes();
-  
+
   if (!times) {
     return c.json({ error: 'No data available for today' }, 404);
   }
-  
+
   return c.json(times);
 });
 
