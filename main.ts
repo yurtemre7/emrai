@@ -1,6 +1,6 @@
 // api/main.ts
 import "jsr:@std/dotenv/load";
-import { Hono } from "@hono/hono";
+import { Hono, Context, Next } from "@hono/hono";
 import { cors } from "@hono/hono/cors";
 import { logger } from "@hono/hono/logger";
 import { sunTimes } from "./constants.ts";
@@ -40,7 +40,7 @@ const VALID_API_KEYS = Deno.env.get('VALID_API_KEYS')?.split(',') || [];
 const kv = await Deno.openKv();
 
 // Simple authentication middleware
-const authenticate = async (c: any, next: any) => {
+const authenticate = async (c: Context, next: Next) => {
   const apiKey = c.req.header('X-API-Key');
 
   if (!apiKey || !VALID_API_KEYS.includes(apiKey)) {
@@ -54,7 +54,7 @@ const authenticate = async (c: any, next: any) => {
 };
 
 // Usage tracking middleware
-const trackUsage = async (c: any, next: any) => {
+const trackUsage = async (c: Context, next: Next) => {
   const userId = c.req.header('X-API-Key');
   const today = new Date().toISOString().split('T')[0];
 
@@ -77,11 +77,11 @@ const trackUsage = async (c: any, next: any) => {
 };
 
 // Check if OpenAI API key is configured
-const checkOpenAiKey = (c: any, next: any) => {
+const checkOpenAiKey = async (c: Context, next: Next) => {
   if (!OPENAI_API_KEY) {
     return c.json({ error: 'OpenAI API key is not configured' }, 500);
   }
-  return next();
+  return await next();
 };
 
 
@@ -92,7 +92,7 @@ app.use('/api/*', authenticate, trackUsage, checkOpenAiKey);
 app.get('/', (c) => c.json({ status: 'ok' }));
 
 // Get current usage
-app.get('/api/usage/', async (c) => {
+app.get('/api/usage/', async (c: Context) => {
   const userId = c.req.header("X-API-Key");
   const today = new Date().toISOString().split('T')[0];
 
@@ -110,7 +110,7 @@ app.get('/api/usage/', async (c) => {
 });
 
 // Define the request handler for the completions endpoint
-app.post('/api/completions/', async (c) => {
+app.post('/api/completions/', async (c: Context) => {
   try {
     // Parse the request body
     const body = await c.req.json();
@@ -160,7 +160,7 @@ app.post('/api/completions/', async (c) => {
 });
 
 // Get API key information
-app.get('/api/key-info/', (c) => {
+app.get('/api/key-info/', (c: Context) => {
   return c.json({
     keys: VALID_API_KEYS.length,
     dailyLimit: parseInt(Deno.env.get('DAILY_LIMIT') || '100')
@@ -168,7 +168,7 @@ app.get('/api/key-info/', (c) => {
 });
 
 // Add this route to your Hono app
-app.get('/ramadan/:date', (c) => {
+app.get('/ramadan/:date', (c: Context) => {
   const date = c.req.param('date');
 
   if (date === "today") {
@@ -198,7 +198,7 @@ app.get('/ramadan/:date', (c) => {
 });
 
 // Alternative: Add a POST endpoint if you prefer
-app.post('/ramadan/', async (c) => {
+app.post('/ramadan/', async (c: Context) => {
   try {
     const body = await c.req.json();
     const date = body.date;
@@ -235,7 +235,7 @@ function getTodaySunTimes(): { begin: string, end: string } | null {
 }
 
 // Add a route to get today's times
-app.get('/ramadan/today/', (c) => {
+app.get('/ramadan/today/', (c: Context) => {
   const times = getTodaySunTimes();
 
   if (!times) {
