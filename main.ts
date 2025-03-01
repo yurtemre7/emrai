@@ -231,7 +231,6 @@ app.post('/ramadan/', async (c) => {
 function getTodaySunTimes(): { begin: string, end: string } | null {
   const today = new Date();
   const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-  console.log(formattedDate);
   return sunTimes[formattedDate] || null;
 }
 
